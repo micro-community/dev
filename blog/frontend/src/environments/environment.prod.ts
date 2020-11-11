@@ -1,5 +1,6 @@
 export const environment = {
   production: true,
   m3oAddress: "https://api.m3o.dev",
-  m3oNamespace: "concert-celtic-uncover"
+  // Replace this before deploying with an actual namespace
+  m3oNamespace: "micro"
 };
