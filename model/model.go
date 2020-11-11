@@ -518,8 +518,7 @@ func (d *model) getOrderedStringFieldKey(i Index, fieldValue string) string {
 }
 
 func (d *model) Delete(query Query) error {
-	defInd := defaultIndex()
-	if !indexMatchesQuery(defInd, query) {
+	if !indexMatchesQuery(d.options.IdIndex, query) {
 		return errors.New("Delete query does not match default index")
 	}
 	results := []map[string]interface{}{}
@@ -528,11 +527,25 @@ func (d *model) Delete(query Query) error {
 		return err
 	}
 	if len(results) == 0 {
+		// @todo should not fail to be idempotent?
 		return errors.New("No entry found to delete")
 	}
-	key := d.indexToKey(defInd, results[0][d.options.IdIndex.FieldName], map[string]interface{}{
-		d.options.IdIndex.FieldName: results[0][d.options.IdIndex.FieldName],
-	}, true)
-	fmt.Printf("Deleting key '%v'\n", key)
-	return d.store.Delete(key)
+
+	// first delete maintained indexes then id index
+	// if we delete id index first then the entry wont
+	// be deletable by id again but the maintained indexes
+	// will be stuck in limbo
+	for _, index := range append(d.indexes, d.options.IdIndex) {
+		key := d.indexToKey(index, results[0][d.options.IdIndex.FieldName], map[string]interface{}{
+			index.FieldName: results[0][index.FieldName],
+		}, true)
+		if d.options.Debug {
+			fmt.Printf("Deleting key '%v'\n", key)
+		}
+		err = d.store.Delete(key)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
