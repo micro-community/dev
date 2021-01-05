@@ -1,7 +1,10 @@
 package model
 
 import (
+	"fmt"
+	"reflect"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/gofrs/uuid"
@@ -18,7 +21,9 @@ type User struct {
 }
 
 func TestEqualsByID(t *testing.T) {
-	table := New(fs.NewStore(), uuid.Must(uuid.NewV4()).String(), nil, nil)
+	table := New(fs.NewStore(), User{}, nil, &ModelOptions{
+		Namespace: uuid.Must(uuid.NewV4()).String(),
+	})
 
 	err := table.Save(User{
 		ID:  "1",
@@ -35,7 +40,7 @@ func TestEqualsByID(t *testing.T) {
 		t.Fatal(err)
 	}
 	users := []User{}
-	q := Equals("id", "1")
+	q := Equals("ID", "1")
 	q.Order.Type = OrderTypeUnordered
 	err = table.List(q, &users)
 	if err != nil {
@@ -47,7 +52,9 @@ func TestEqualsByID(t *testing.T) {
 }
 
 func TestRead(t *testing.T) {
-	table := New(fs.NewStore(), uuid.Must(uuid.NewV4()).String(), Indexes(ByEquality("age")), nil)
+	table := New(fs.NewStore(), User{}, Indexes(ByEquality("age")), &ModelOptions{
+		Namespace: uuid.Must(uuid.NewV4()).String(),
+	})
 	user := User{}
 	err := table.Read(Equals("age", 25), &user)
 	if err != ErrorNotFound {
@@ -85,7 +92,9 @@ func TestRead(t *testing.T) {
 }
 
 func TestEquals(t *testing.T) {
-	table := New(fs.NewStore(), uuid.Must(uuid.NewV4()).String(), Indexes(ByEquality("age")), nil)
+	table := New(fs.NewStore(), User{}, Indexes(ByEquality("age")), &ModelOptions{
+		Namespace: uuid.Must(uuid.NewV4()).String(),
+	})
 
 	err := table.Save(User{
 		ID:  "1",
@@ -163,7 +172,9 @@ func TestOrderingStrings(t *testing.T) {
 			tagIndex.Order.Type = OrderTypeDesc
 		}
 		tagIndex.StringOrderPadLength = 12
-		table := New(fs.NewStore(), uuid.Must(uuid.NewV4()).String(), Indexes(tagIndex), nil)
+		table := New(fs.NewStore(), User{}, Indexes(tagIndex), &ModelOptions{
+			Namespace: uuid.Must(uuid.NewV4()).String(),
+		})
 		for _, key := range c.tags {
 			err := table.Save(User{
 				ID:  uuid.Must(uuid.NewV4()).String(),
@@ -231,7 +242,9 @@ func TestOrderingNumbers(t *testing.T) {
 		if c.reverse {
 			createdIndex.Order.Type = OrderTypeDesc
 		}
-		table := New(fs.NewStore(), uuid.Must(uuid.NewV4()).String(), Indexes(createdIndex), nil)
+		table := New(fs.NewStore(), User{}, Indexes(createdIndex), &ModelOptions{
+			Namespace: uuid.Must(uuid.NewV4()).String(),
+		})
 		for _, key := range c.dates {
 			err := table.Save(User{
 				ID:      uuid.Must(uuid.NewV4()).String(),
@@ -274,7 +287,9 @@ func TestOrderingNumbers(t *testing.T) {
 
 func TestStaleIndexRemoval(t *testing.T) {
 	tagIndex := ByEquality("tag")
-	table := New(fs.NewStore(), uuid.Must(uuid.NewV4()).String(), Indexes(tagIndex), nil)
+	table := New(fs.NewStore(), User{}, Indexes(tagIndex), &ModelOptions{
+		Namespace: uuid.Must(uuid.NewV4()).String(),
+	})
 	err := table.Save(User{
 		ID:  "1",
 		Tag: "hi-there",
@@ -302,7 +317,9 @@ func TestStaleIndexRemoval(t *testing.T) {
 func TestUniqueIndex(t *testing.T) {
 	tagIndex := ByEquality("tag")
 	tagIndex.Unique = true
-	table := New(fs.NewStore(), uuid.Must(uuid.NewV4()).String(), Indexes(tagIndex), nil)
+	table := New(fs.NewStore(), User{}, Indexes(tagIndex), &ModelOptions{
+		Namespace: uuid.Must(uuid.NewV4()).String(),
+	})
 	err := table.Save(User{
 		ID:  "1",
 		Tag: "hi-there",
@@ -336,8 +353,9 @@ func TestNonIDKeys(t *testing.T) {
 	slugIndex := ByEquality("slug")
 	slugIndex.Order.Type = OrderTypeUnordered
 
-	table := New(fs.NewStore(), uuid.Must(uuid.NewV4()).String(), nil, &ModelOptions{
-		IdIndex: slugIndex,
+	table := New(fs.NewStore(), Tag{}, nil, &ModelOptions{
+		IdIndex:   slugIndex,
+		Namespace: uuid.Must(uuid.NewV4()).String(),
 	})
 
 	err := table.Save(Tag{
@@ -373,9 +391,10 @@ func TestListByString(t *testing.T) {
 	slugIndex.Order.Type = OrderTypeUnordered
 
 	typeIndex := ByEquality("type")
-	table := New(fs.NewStore(), uuid.Must(uuid.NewV4()).String(), Indexes(typeIndex), &ModelOptions{
-		IdIndex: slugIndex,
-		Debug:   false,
+	table := New(fs.NewStore(), Tag{}, Indexes(typeIndex), &ModelOptions{
+		IdIndex:   slugIndex,
+		Debug:     false,
+		Namespace: uuid.Must(uuid.NewV4()).String(),
 	})
 
 	err := table.Save(Tag{
@@ -412,9 +431,10 @@ func TestOderByDifferentFieldThanFilterField(t *testing.T) {
 		Type:      OrderTypeDesc,
 		FieldName: "age",
 	}
-	table := New(fs.NewStore(), uuid.Must(uuid.NewV4()).String(), Indexes(typeIndex), &ModelOptions{
-		IdIndex: slugIndex,
-		Debug:   false,
+	table := New(fs.NewStore(), Tag{}, Indexes(typeIndex), &ModelOptions{
+		Namespace: uuid.Must(uuid.NewV4()).String(),
+		IdIndex:   slugIndex,
+		Debug:     false,
 	})
 
 	err := table.Save(Tag{
@@ -470,9 +490,10 @@ func TestDeleteIndexCleanup(t *testing.T) {
 	slugIndex.Order.Type = OrderTypeUnordered
 
 	typeIndex := ByEquality("type")
-	table := New(fs.NewStore(), uuid.Must(uuid.NewV4()).String(), Indexes(typeIndex), &ModelOptions{
-		IdIndex: slugIndex,
-		Debug:   false,
+	table := New(fs.NewStore(), Tag{}, Indexes(typeIndex), &ModelOptions{
+		Namespace: uuid.Must(uuid.NewV4()).String(),
+		IdIndex:   slugIndex,
+		Debug:     false,
 	})
 
 	err := table.Save(Tag{
@@ -513,4 +534,209 @@ func TestDeleteIndexCleanup(t *testing.T) {
 		t.Fatal(tags)
 	}
 
+}
+
+func TestUpdateDeleteIndexMaintenance(t *testing.T) {
+	updIndex := ByEquality("updated")
+	updIndex.Order.Type = OrderTypeDesc
+
+	table := New(fs.NewStore(), User{}, Indexes(updIndex), &ModelOptions{
+		Namespace: uuid.Must(uuid.NewV4()).String(),
+		Debug:     false,
+	})
+
+	err := table.Save(User{
+		ID:      "1",
+		Age:     12,
+		Updated: 5000,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = table.Save(User{
+		ID:      "2",
+		Age:     25,
+		Updated: 5001,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	users := []User{}
+	q := updIndex.ToQuery(nil)
+	err = table.List(q, &users)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(users) != 2 {
+		t.Fatal(users)
+	}
+	if users[0].ID != "2" || users[1].ID != "1" {
+		t.Fatal(users)
+	}
+
+	err = table.Save(User{
+		ID:      "1",
+		Age:     12,
+		Updated: 5002,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = table.List(q, &users)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(users) != 2 {
+		t.Fatal(users)
+	}
+	if users[0].ID != "1" || users[1].ID != "2" {
+		t.Fatal(users)
+	}
+}
+
+type TypeTest struct {
+	ID  string `json:"ID"`
+	F32 float32
+	F64 float64
+	I   int
+	I32 int32
+	I64 int64
+	S   string
+	B   bool
+}
+
+// Test aimed specifically to test all types
+func TestAllCombos(t *testing.T) {
+	// go over all filter + order combos
+	// for equality indexing
+
+	v := reflect.ValueOf(TypeTest{})
+	for filterFieldI := 0; filterFieldI < v.NumField(); filterFieldI++ {
+		filterField := v.Field(filterFieldI)
+		for orderFieldI := 0; orderFieldI < v.NumField(); orderFieldI++ {
+			orderField := v.Field(orderFieldI)
+
+			filterFieldName := v.Type().Field(filterFieldI).Name
+			orderFieldName := v.Type().Field(orderFieldI).Name
+			if filterFieldName == "ID" || orderFieldName == "ID" {
+				continue
+			}
+			if filterFieldName == orderFieldName {
+				continue
+			}
+
+			t.Run(fmt.Sprintf("Filter by %v, order by %v ASC", filterField.Type().Name(), orderField.Type().Name()), func(t *testing.T) {
+				index := ByEquality(filterFieldName)
+				index.Order.Type = OrderTypeAsc
+				index.Order.FieldName = orderFieldName
+
+				table := New(fs.NewStore(), TypeTest{}, Indexes(index), &ModelOptions{
+					Namespace: uuid.Must(uuid.NewV4()).String(),
+					Debug:     false,
+				})
+
+				small := TypeTest{
+					ID: "1",
+				}
+				v1 := getExampleValue(getFieldValue(small, orderFieldName), 1)
+				setFieldValue(&small, orderFieldName, v1)
+
+				large := TypeTest{
+					ID: "2",
+				}
+				v2 := getExampleValue(getFieldValue(large, orderFieldName), 2)
+				setFieldValue(&large, orderFieldName, v2)
+
+				err := table.Save(small)
+				if err != nil {
+					t.Fatal(err)
+				}
+				err = table.Save(large)
+				if err != nil {
+					t.Fatal(err)
+				}
+				results := []TypeTest{}
+				err = table.List(Equals(filterFieldName, nil), &results)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(results) < 2 {
+					t.Fatal(results)
+				}
+				if results[0].ID != "1" || results[1].ID != "2" {
+					t.Fatal("Results:", results, results[0].ID, results[1].ID)
+				}
+			})
+			t.Run(fmt.Sprintf("Filter by %v, order by %v DESC", filterField.Type().Name(), orderField.Type().Name()), func(t *testing.T) {
+				index := ByEquality(filterFieldName)
+				index.Order.Type = OrderTypeDesc
+				index.Order.FieldName = orderFieldName
+
+				table := New(fs.NewStore(), TypeTest{}, Indexes(index), &ModelOptions{
+					Namespace: uuid.Must(uuid.NewV4()).String(),
+					Debug:     false,
+				})
+
+				small := TypeTest{
+					ID: "1",
+				}
+				v1 := getExampleValue(getFieldValue(small, orderFieldName), 1)
+				setFieldValue(&small, orderFieldName, v1)
+
+				large := TypeTest{
+					ID: "2",
+				}
+				v2 := getExampleValue(getFieldValue(large, orderFieldName), 2)
+				setFieldValue(&large, orderFieldName, v2)
+
+				err := table.Save(small)
+				if err != nil {
+					t.Fatal(err)
+				}
+				err = table.Save(large)
+				if err != nil {
+					t.Fatal(err)
+				}
+				results := []TypeTest{}
+				err = table.List(index.ToQuery(nil), &results)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(results) < 2 {
+					t.Fatal(results)
+				}
+				if results[0].ID != "2" || results[1].ID != "1" {
+					t.Fatal("Results:", results, results[0].ID, results[1].ID)
+				}
+			})
+		}
+	}
+}
+
+// returns an example value generated
+// nth = each successive number should cause this
+// function to return a "bigger value" for each type
+func getExampleValue(i interface{}, nth int) interface{} {
+	switch v := i.(type) {
+	case string:
+		return strings.Repeat("a", nth)
+	case bool:
+		if nth == 1 {
+			return false
+		}
+		return true
+	case float32:
+		return v + float32(nth) + .1
+	case float64:
+		return v + float64(nth) + 0.1
+	case int:
+		return v + nth
+	case int32:
+		return v + int32(nth)
+	case int64:
+		return v + int64(nth)
+	}
+	return nil
 }
